@@ -7,13 +7,16 @@
 //
 
 #import "ViewController.h"
-#import "TestBridge.h"
+#import "UIWebView+JsBridge.h"
+#import "JsObject.h"
+
 
 @interface ViewController ()
 
-@property (nonatomic) TestBridge* bridge;
+@property (weak, nonatomic) IBOutlet UIWebView *webview;
 
 @end
+
 
 @implementation ViewController
 
@@ -21,13 +24,18 @@
 {
     [super viewDidLoad];
 	
-    //设置oc和js的桥接
-    _bridge = [TestBridge bridgeForWebView:_webview webViewDelegate:self];
-    //test only
     NSString* htmlPath = [[NSBundle mainBundle] pathForResource:@"ExampleApp" ofType:@"html"];
     NSString* appHtml = [NSString stringWithContentsOfFile:htmlPath encoding:NSUTF8StringEncoding error:nil];
+    
+    JsObject* jsObject = [[JsObject alloc] init];
+    [_webview yoyo_addJavascriptInterface:jsObject forName:@"GameHelper"];
     [_webview loadHTMLString:appHtml baseURL:nil];
 }
 
+//#pragma mark - WebView Delegate
+//
+//- (void)webViewDidFinishLoad:(UIWebView *)webView {
+//    NSLog(@"%s %d webViewDidFinishLoad", __FUNCTION__, __LINE__);
+//}
 
 @end

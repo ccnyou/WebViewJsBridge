@@ -9,66 +9,133 @@
 #import "WebViewJsBridge.h"
 #import <objc/runtime.h>
 
+
+#define kCustomProtocolScheme @"jscall"
+
+
 @interface WebViewJsBridge ()
 
-@property (nonatomic, weak) id webViewDelegate;
-@property (nonatomic, weak) NSBundle *resourceBundle;
+@property (nonatomic,   weak) id         webViewDelegate;
+@property (nonatomic,   weak) NSBundle*  resourceBundle;
+@property (nonatomic, strong) NSString*  bridgeName;
+@property (nonatomic, strong) id         bridgeObject;
 
 @end
 
+
 @implementation WebViewJsBridge
 
-+ (instancetype)bridgeForWebView:(UIWebView*)webView webViewDelegate:(NSObject<UIWebViewDelegate>*)webViewDelegate {
-    return [self bridgeForWebView:webView webViewDelegate:webViewDelegate resourceBundle:nil];
++ (instancetype)bridgeForWebView:(UIWebView *)webView
+                    bridgeObject:(id)bridgeObject
+                      bridgeName:(NSString *)bridgeName
+                 webViewDelegate:(NSObject<UIWebViewDelegate>*)webViewDelegate {
+    return [self bridgeForWebView:webView bridgeObject:bridgeObject bridgeName:bridgeName webViewDelegate:webViewDelegate resourceBundle:nil];
 }
 
-+ (instancetype)bridgeForWebView:(UIWebView*)webView webViewDelegate:(NSObject<UIWebViewDelegate>*)webViewDelegate resourceBundle:(NSBundle*)bundle
-{
-    WebViewJsBridge* bridge = [[[self class] alloc] init];
-    [bridge _platformSpecificSetup:webView webViewDelegate:webViewDelegate resourceBundle:bundle];
++ (instancetype)bridgeForWebView:(UIWebView *)webView
+                    bridgeObject:(id)bridgeObject
+                      bridgeName:(NSString *)bridgeName
+                 webViewDelegate:(NSObject<UIWebViewDelegate> *)webViewDelegate
+                  resourceBundle:(NSBundle *)bundle {
+    WebViewJsBridge* bridge = [[WebViewJsBridge alloc] init];
+    [bridge _platformSpecificSetup:webView bridgeObject:bridgeObject bridgeName:bridgeName webViewDelegate:webViewDelegate resourceBundle:bundle];
     return bridge;
 }
 
 #pragma mark - init & dealloc
 
-- (void) _platformSpecificSetup:(UIWebView*)webView webViewDelegate:(id<UIWebViewDelegate>)webViewDelegate resourceBundle:(NSBundle*)bundle{
+- (void)_platformSpecificSetup:(UIWebView*)webView
+                  bridgeObject:(id)bridgeObject
+                    bridgeName:(NSString *)bridgeName
+               webViewDelegate:(id<UIWebViewDelegate>)webViewDelegate
+                resourceBundle:(NSBundle*)bundle{
     _webView = webView;
+    _bridgeObject = bridgeObject;
+    _bridgeName = bridgeName;
     _webViewDelegate = webViewDelegate;
     _webView.delegate = self;
     _resourceBundle = bundle;
 }
 
-- (void)dealloc {
-    _webView.delegate = nil;
+- (BOOL)_isJavascriptInserted {
+    NSString* javascript = [NSString stringWithFormat:@"typeof %@ == 'object'", self.bridgeName];
+    NSString* jsResult = [self.webView stringByEvaluatingJavaScriptFromString:javascript];
+    if ([jsResult isEqualToString:@"true"]) {
+        return YES;
+    }
     
-    _webView = nil;
-    _webViewDelegate = nil;
+    return NO;
+}
+
+- (BOOL)_isMethodNameValid:(NSString *)methodName {
+    if ([methodName characterAtIndex:0] == '.') {
+        return NO;
+    }
+    
+    // add any filter here if needed
+    
+    return YES;
+}
+
+- (void)_insertJavascript {
+    unsigned int methodCount = 0;
+    //get class method dynamically
+    Method *methods = class_copyMethodList([self.bridgeObject class], &methodCount);
+    NSMutableString *methodList = [NSMutableString string];
+    for (int i = 0; i < methodCount; i++) {
+        const char* pMethodName = sel_getName(method_getName(methods[i]));
+        NSString *methodName = [NSString stringWithCString:pMethodName encoding:NSUTF8StringEncoding];
+        if (![self _isMethodNameValid:methodName]) {
+            continue;
+        }
+        
+        [methodList appendString:@"\""];
+        [methodList appendString:[methodName stringByReplacingOccurrencesOfString:@":" withString:@""]];
+        [methodList appendString:@"\","];
+    }
+    
+    if (methodList.length > 0) {
+        [methodList deleteCharactersInRange:NSMakeRange(methodList.length - 1, 1)];
+    }
+    
+    NSBundle *bundle = _resourceBundle ? _resourceBundle : [NSBundle mainBundle];
+    NSString *filePath = [bundle pathForResource:@"WebViewJsBridge" ofType:@"js"];
+    NSString *jsFileContent = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
+    
+    NSString* javascript = [NSString stringWithFormat:jsFileContent, self.bridgeName, methodList];
+    [self.webView stringByEvaluatingJavaScriptFromString:javascript];
+}
+
+- (void)_callBridgeMethodWithUrl:(NSURL *)url {
+    NSArray *components = [[url absoluteString] componentsSeparatedByString:@":"];
+    
+    NSString *methodName = (NSString*)[components objectAtIndex:1];
+    NSString *argsAsString = [(NSString*)[components objectAtIndex:2]
+                              stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    NSData *argsData = [argsAsString dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *argsDic = (NSDictionary *)[NSJSONSerialization JSONObjectWithData:argsData options:kNilOptions error:NULL];
+    //convert js array to objc array
+    NSMutableArray *args = [NSMutableArray array];
+    for (int i = 0; i < [argsDic count]; i++) {
+        [args addObject:[argsDic objectForKey:[NSString stringWithFormat:@"%d", i]]];
+    }
+    
+    //ignore warning
+    NSString* selectorName = [args count] > 0 ? [methodName stringByAppendingString:@":"] : methodName;
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+    SEL selector = NSSelectorFromString(selectorName);
+    if ([self.bridgeObject respondsToSelector:selector]) {
+        [self.bridgeObject performSelector:selector withObject:args];
+    }
 }
 
 #pragma mark - UIWebView Delegate
 
 - (void)webViewDidFinishLoad:(UIWebView *)webView {
     if (webView != _webView) { return; }
-    //is js insert
-    if (![[webView stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:@"typeof window.%@ == 'object'", kBridgeName]] isEqualToString:@"true"]) {
-        //get class method dynamically
-        unsigned int methodCount = 0;
-        Method *methods = class_copyMethodList([self class], &methodCount);
-        NSMutableString *methodList = [NSMutableString string];
-        for (int i=0; i<methodCount; i++) {
-            NSString *methodName = [NSString stringWithCString:sel_getName(method_getName(methods[i])) encoding:NSUTF8StringEncoding];
-            [methodList appendString:@"\""];
-            [methodList appendString:[methodName stringByReplacingOccurrencesOfString:@":" withString:@""]];
-            [methodList appendString:@"\","];
-        }
-        if (methodList.length>0) {
-            [methodList deleteCharactersInRange:NSMakeRange(methodList.length-1, 1)];
-        }
-        
-        NSBundle *bundle = _resourceBundle ? _resourceBundle : [NSBundle mainBundle];
-        NSString *filePath = [bundle pathForResource:@"WebViewJsBridge" ofType:@"js"];
-        NSString *js = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
-        [webView stringByEvaluatingJavaScriptFromString:[NSString stringWithFormat:js, methodList]];
+
+    if (![self _isJavascriptInserted]) {
+        [self _insertJavascript];
     }
 
     __strong typeof(_webViewDelegate) strongDelegate = _webViewDelegate;
@@ -87,30 +154,16 @@
 }
 
 - (BOOL)webView:(UIWebView *)webView shouldStartLoadWithRequest:(NSURLRequest *)request navigationType:(UIWebViewNavigationType)navigationType {
-    if (webView != _webView) { return YES; }
+    if (webView != _webView) {
+        return YES;
+    }
+    
     NSURL *url = [request URL];
     __strong typeof(_webViewDelegate) strongDelegate = _webViewDelegate;
     
     NSString *requestString = [[request URL] absoluteString];
     if ([requestString hasPrefix:kCustomProtocolScheme]) {
-        NSArray *components = [[url absoluteString] componentsSeparatedByString:@":"];
-        
-        NSString *function = (NSString*)[components objectAtIndex:1];
-        NSString *argsAsString = [(NSString*)[components objectAtIndex:2]
-                                  stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-        NSData *argsData = [argsAsString dataUsingEncoding:NSUTF8StringEncoding];
-        NSDictionary *argsDic = (NSDictionary *)[NSJSONSerialization JSONObjectWithData:argsData options:kNilOptions error:NULL];
-        //convert js array to objc array
-        NSMutableArray *args = [NSMutableArray array];
-        for (int i=0; i<[argsDic count]; i++) {
-            [args addObject:[argsDic objectForKey:[NSString stringWithFormat:@"%d", i]]];
-        }
-        //ignore warning
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        SEL selector = NSSelectorFromString([args count]>0?[function stringByAppendingString:@":"]:function);
-        if ([self respondsToSelector:selector]) {
-            [self performSelector:selector withObject:args];
-        }
+        [self _callBridgeMethodWithUrl:url];
         return NO;
     } else if (strongDelegate && [strongDelegate respondsToSelector:@selector(webView:shouldStartLoadWithRequest:navigationType:)]) {
         return [strongDelegate webView:webView shouldStartLoadWithRequest:request navigationType:navigationType];
@@ -136,6 +189,7 @@
     if (obj) {
         js = [NSString stringWithFormat:@"%@.%@", obj, function];
     }
+    
     NSLog(@"excuteJS:%@", js);
     [self.webView stringByEvaluatingJavaScriptFromString:js];
 }
