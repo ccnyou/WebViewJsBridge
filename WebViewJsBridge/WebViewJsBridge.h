@@ -11,6 +11,8 @@
 
 @interface WebViewJsBridge : NSObject<UIWebViewDelegate>
 
+@property (nonatomic, strong) NSString* protocolScheme;
+@property (nonatomic, strong) NSString* readyEventName;
 @property (nonatomic,   weak) UIWebView* webView;
 
 

@@ -16,6 +16,12 @@
     self.bridge = [WebViewJsBridge bridgeForWebView:self bridgeObject:object bridgeName:name webViewDelegate:self.delegate];
 }
 
+- (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name protocolScheme:(NSString *)protocolScheme readyEventName:(NSString *)readyEventName {
+    [self yoyo_addJavascriptInterface:object forName:name];
+    self.bridge.protocolScheme = protocolScheme;
+    self.bridge.readyEventName = readyEventName;
+}
+
 - (void)setBridge:(WebViewJsBridge *)bridge {
     objc_setAssociatedObject(self, @"bridge", bridge, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }

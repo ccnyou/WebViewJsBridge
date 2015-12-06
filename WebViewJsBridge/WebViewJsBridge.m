@@ -9,10 +9,6 @@
 #import "WebViewJsBridge.h"
 #import <objc/runtime.h>
 
-
-#define kCustomProtocolScheme @"jscall"
-
-
 @interface WebViewJsBridge ()
 
 @property (nonatomic,   weak) id         webViewDelegate;
@@ -41,6 +37,23 @@
     [bridge _platformSpecificSetup:webView bridgeObject:bridgeObject bridgeName:bridgeName webViewDelegate:webViewDelegate resourceBundle:bundle];
     return bridge;
 }
+
+- (NSString *)protocolScheme {
+    if (!_protocolScheme) {
+        _protocolScheme = @"jscall";
+    }
+    
+    return _protocolScheme;
+}
+
+- (NSString *)readyEventName {
+    if (!_readyEventName) {
+        _readyEventName = @"JsBridgeReady";
+    }
+    
+    return _readyEventName;
+}
+
 
 #pragma mark - init & dealloc
 
@@ -102,14 +115,14 @@
     NSString *filePath = [bundle pathForResource:@"WebViewJsBridge" ofType:@"js"];
     NSString *jsFileContent = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
     
-    NSString* javascript = [NSString stringWithFormat:jsFileContent, self.bridgeName, methodList];
+    NSString* javascript = [NSString stringWithFormat:jsFileContent, self.bridgeName, self.protocolScheme, self.readyEventName, methodList];
     [self.webView stringByEvaluatingJavaScriptFromString:javascript];
 }
 
 - (void)_callBridgeMethodWithUrl:(NSURL *)url {
     NSArray *components = [[url absoluteString] componentsSeparatedByString:@":"];
     
-    NSString *methodName = (NSString*)[components objectAtIndex:1];
+    NSString *methodName = (NSString *)[components objectAtIndex:1];
     NSString *argsAsString = [(NSString*)[components objectAtIndex:2]
                               stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
     NSData *argsData = [argsAsString dataUsingEncoding:NSUTF8StringEncoding];
@@ -162,7 +175,7 @@
     __strong typeof(_webViewDelegate) strongDelegate = _webViewDelegate;
     
     NSString *requestString = [[request URL] absoluteString];
-    if ([requestString hasPrefix:kCustomProtocolScheme]) {
+    if ([requestString hasPrefix:self.protocolScheme]) {
         [self _callBridgeMethodWithUrl:url];
         return NO;
     } else if (strongDelegate && [strongDelegate respondsToSelector:@selector(webView:shouldStartLoadWithRequest:navigationType:)]) {

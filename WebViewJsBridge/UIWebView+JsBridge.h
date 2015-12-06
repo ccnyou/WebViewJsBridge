@@ -17,5 +17,6 @@
 @property (nonatomic, strong) WebViewJsBridge* bridge;
 
 - (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name;
+- (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name protocolScheme:(NSString *)protocolScheme readyEventName:(NSString *)readyEventName;
 
 @end
