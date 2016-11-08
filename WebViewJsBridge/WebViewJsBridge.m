@@ -7,16 +7,35 @@
 //
 
 #import "WebViewJsBridge.h"
-#import "NSArray+Yoyo.h"
 #import <objc/runtime.h>
 
-@interface WebViewJsBridge ()
+@interface NSArray (Yoyo)
+// 用 elementBlock 拷贝元素，拷贝之前都会经过 elementBlock 处理，返回处理之后的元素
+- (NSArray *)yoyo_copyElements:(id (^)(id element))elementBlock;
+@end
 
+@implementation NSArray (Yoyo)
+
+- (NSArray *)yoyo_copyElements:(id (^)(id element))elementBlock {
+    NSMutableArray* result = [[NSMutableArray alloc] init];
+    for (id element in self) {
+        id newElement = elementBlock(element);
+        if (newElement) {
+            [result addObject:newElement];
+        }
+    }
+    
+    return result;
+}
+
+@end
+
+
+@interface WebViewJsBridge ()
 @property (nonatomic,   weak) id         webViewDelegate;
 @property (nonatomic,   weak) NSBundle*  resourceBundle;
 @property (nonatomic, strong) NSString*  bridgeName;
 @property (nonatomic, strong) id         bridgeObject;
-
 @end
 
 

@@ -29,7 +29,7 @@
         e.preventDefault();
         var data = 'Hello from JS button';
         log('JS sending message', data);
-        GameHelper.test1(data, 'haha');
+        JsNative.test1(data, 'haha');
     }
     
     document.body.appendChild(document.createElement('br'))
@@ -39,7 +39,7 @@
     callbackButton.onclick = function(e) {
         e.preventDefault()
         log('JS calling handler "testObjcCallback"');
-        GameHelper.test2();
+        JsNative.test2();
     }
     
 	</script>
