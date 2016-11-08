@@ -7,6 +7,7 @@
 //
 
 #import "WebViewJsBridge.h"
+#import "NSArray+Yoyo.h"
 #import <objc/runtime.h>
 
 @interface WebViewJsBridge ()
@@ -25,7 +26,11 @@
                     bridgeObject:(id)bridgeObject
                       bridgeName:(NSString *)bridgeName
                  webViewDelegate:(NSObject<UIWebViewDelegate>*)webViewDelegate {
-    return [self bridgeForWebView:webView bridgeObject:bridgeObject bridgeName:bridgeName webViewDelegate:webViewDelegate resourceBundle:nil];
+    return [self bridgeForWebView:webView
+                     bridgeObject:bridgeObject
+                       bridgeName:bridgeName
+                  webViewDelegate:webViewDelegate
+                   resourceBundle:nil];
 }
 
 + (instancetype)bridgeForWebView:(UIWebView *)webView
@@ -34,7 +39,11 @@
                  webViewDelegate:(NSObject<UIWebViewDelegate> *)webViewDelegate
                   resourceBundle:(NSBundle *)bundle {
     WebViewJsBridge* bridge = [[WebViewJsBridge alloc] init];
-    [bridge _platformSpecificSetup:webView bridgeObject:bridgeObject bridgeName:bridgeName webViewDelegate:webViewDelegate resourceBundle:bundle];
+    [bridge _platformSpecificSetup:webView
+                      bridgeObject:bridgeObject
+                        bridgeName:bridgeName
+                   webViewDelegate:webViewDelegate
+                    resourceBundle:bundle];
     return bridge;
 }
 
@@ -114,9 +123,16 @@
     NSBundle *bundle = _resourceBundle ? _resourceBundle : [NSBundle mainBundle];
     NSString *filePath = [bundle pathForResource:@"WebViewJsBridge" ofType:@"js"];
     NSString *jsFileContent = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
-    
     NSString* javascript = [NSString stringWithFormat:jsFileContent, self.bridgeName, self.protocolScheme, self.readyEventName, methodList];
-    [self.webView stringByEvaluatingJavaScriptFromString:javascript];
+    __strong UIWebView* webView = self.webView;
+    if (webView) {
+        [webView stringByEvaluatingJavaScriptFromString:javascript];
+    }
+    
+    // You must free the array with free().
+    if (methods) {
+        free(methods);
+    }
 }
 
 - (void)_callBridgeMethodWithUrl:(NSURL *)url {
@@ -203,8 +219,34 @@
         js = [NSString stringWithFormat:@"%@.%@", obj, function];
     }
     
+    //js = [NSString stringWithFormat:@";function(){ window[\"alert\"] = function(msg) { GameHelper.log(msg) }; %@; })();", js];
     NSLog(@"excuteJS:%@", js);
-    [self.webView stringByEvaluatingJavaScriptFromString:js];
+    __strong UIWebView* webView = self.webView;
+    if (webView) {
+        [webView stringByEvaluatingJavaScriptFromString:js];
+    }
+}
+
+- (void)excuteJSWithObj:(NSString *)obj function:(NSString *)function args:(NSArray *)args {
+    if (!args) {
+        return;
+    }
+    
+    args = [args yoyo_copyElements:^id(id element) {
+        NSError* error = nil;
+        NSData* data = [NSJSONSerialization dataWithJSONObject:@[element] options:0 error:&error];
+        NSString* json = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        NSString* result = [json substringWithRange:NSMakeRange(1, json.length - 2)];
+        return result;
+    }];
+    
+    NSString* arguments = [args componentsJoinedByString:@","];
+    function = [NSString stringWithFormat:@"%@(%@)", function, arguments];
+    [self excuteJSWithObj:obj function:function];
+}
+
+- (void)excuteCallback:(NSArray *)args {
+    [self excuteJSWithObj:self.bridgeName function:@"callback" args:args];
 }
 
 @end

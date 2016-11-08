@@ -22,10 +22,23 @@
 	}
   
 	window[bridge] = {};
+    window[bridge].getArguments = function(args) {
+    	var lastArg = args[args.length - 1];
+    	if (typeof(lastArg) == "function") {
+    		this.callback = lastArg;
+            args.length = args.length - 1;
+    	} else {
+    		this.callback = function(){};
+    	}
+  
+        var result = JSON.stringify(args);
+    	return result;
+    };
+
     var methods = [%@];
     for (var i = 0; i < methods.length; i++){
         var method = methods[i];
-        var code = "(window[bridge])[method] = function " + method + "() { messagingIframe.src = protocolScheme + ':' + arguments.callee.name + ':' + encodeURIComponent(JSON.stringify(arguments));}";
+        var code = "(window[bridge])[method] = function " + method + "() { messagingIframe.src = protocolScheme + ':' + arguments.callee.name + ':' + encodeURIComponent(window[bridge].getArguments(arguments));}";
         eval(code);
     }
   

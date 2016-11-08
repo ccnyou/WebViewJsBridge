@@ -28,5 +28,7 @@
                   resourceBundle:(NSBundle*)bundle;
 
 - (void)excuteJSWithObj:(NSString *)obj function:(NSString *)function;
+- (void)excuteJSWithObj:(NSString *)obj function:(NSString *)function args:(NSArray *)args;
+- (void)excuteCallback:(NSArray *)args;
 
 @end

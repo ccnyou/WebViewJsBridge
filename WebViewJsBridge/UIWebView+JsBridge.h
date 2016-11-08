@@ -18,5 +18,7 @@
 
 - (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name;
 - (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name protocolScheme:(NSString *)protocolScheme readyEventName:(NSString *)readyEventName;
+- (void)yoyo_executeCallback:(NSArray *)args;
+- (void)yoyo_excuteJSWithObj:(NSString *)obj function:(NSString *)function args:(NSArray *)args;
 
 @end

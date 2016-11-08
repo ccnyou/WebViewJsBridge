@@ -12,11 +12,20 @@
 
 @implementation UIWebView (bridge)
 
-- (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name {
-    self.bridge = [WebViewJsBridge bridgeForWebView:self bridgeObject:object bridgeName:name webViewDelegate:self.delegate];
+- (void)yoyo_addJavascriptInterface:(id)object
+                            forName:(NSString *)name
+{
+    self.bridge = [WebViewJsBridge bridgeForWebView:self
+                                       bridgeObject:object
+                                         bridgeName:name
+                                    webViewDelegate:self.delegate];
 }
 
-- (void)yoyo_addJavascriptInterface:(id)object forName:(NSString *)name protocolScheme:(NSString *)protocolScheme readyEventName:(NSString *)readyEventName {
+- (void)yoyo_addJavascriptInterface:(id)object
+                            forName:(NSString *)name
+                     protocolScheme:(NSString *)protocolScheme
+                     readyEventName:(NSString *)readyEventName
+{
     [self yoyo_addJavascriptInterface:object forName:name];
     self.bridge.protocolScheme = protocolScheme;
     self.bridge.readyEventName = readyEventName;
@@ -29,6 +38,24 @@
 - (WebViewJsBridge *)bridge {
     WebViewJsBridge* result = objc_getAssociatedObject(self, @"bridge");
     return result;
+}
+
+- (void)yoyo_executeCallback:(NSArray *)args {
+    WebViewJsBridge* bridge = self.bridge;
+    if (!bridge) {
+        return;
+    }
+    
+    [bridge excuteCallback:args];
+}
+
+- (void)yoyo_excuteJSWithObj:(NSString *)obj function:(NSString *)function args:(NSArray *)args {
+    WebViewJsBridge* bridge = self.bridge;
+    if (!bridge) {
+        return;
+    }
+    
+    [bridge excuteJSWithObj:obj function:function args:args];
 }
 
 @end
