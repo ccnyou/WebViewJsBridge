@@ -5,13 +5,24 @@ A bridge used for Objective-C and JavaScript, which implements the same mechanis
 
 
 ## Usage
-* Inject Native Object:
+* Inject Native OC Object:
 ```objective-c
-    NSString* htmlPath = [[NSBundle mainBundle] pathForResource:@"ExampleApp" ofType:@"html"];
-    NSString* appHtml = [NSString stringWithContentsOfFile:htmlPath encoding:NSUTF8StringEncoding error:nil];
-
     JsObject* jsObject = [[JsObject alloc] init];
     [_webview yoyo_addJavascriptInterface:jsObject forName:@"JsNative"];
     [_webview loadHTMLString:appHtml baseURL:nil];
 ```
 
+* Js callback
+```js
+	JsNative.testCallback1("arg1", "call_back_name");
+```
+```objective-c
+	[webview yoyo_excuteJSWithObj:@"window" function:@"call_back_name" args:@[result]];
+```
+
+```js
+	JsNative.testCallback1("arg1", function(arg) {});
+```
+```objective-c
+	[webview yoyo_executeCallback:@[result]];
+```
