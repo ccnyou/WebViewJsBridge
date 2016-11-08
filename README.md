@@ -13,16 +13,11 @@ A bridge used for Objective-C and JavaScript, which implements the same mechanis
 ```
 
 * Js callback
-```js
-	JsNative.testCallback1("arg1", "call_back_name");
-```
 ```objective-c
+	// js: JsNative.testCallback1("arg1", "call_back_name");
 	[webview yoyo_excuteJSWithObj:@"window" function:@"call_back_name" args:@[result]];
-```
 
-```js
-	JsNative.testCallback1("arg1", function(arg) {});
-```
-```objective-c
+	// js: JsNative.testCallback1("arg1", function(arg) {});
 	[webview yoyo_executeCallback:@[result]];
 ```
+
